@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Generative AI Webapp</title>
+    <style>
+        :root {
+            --primary-color: #3498db;
+            --secondary-color: #2c3e50;
+            --accent-color: #e74c3c;
+            --background-color: #ecf0f1;
+            --text-color: #34495e;
+        }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            line-height: 1.6;
+            color: var(--text-color);
+            background-color: var(--background-color);
+            margin: 0;
+            padding: 0;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        h1 {
+            text-align: center;
+            color: var(--secondary-color);
+            margin-bottom: 30px;
+        }
+
+        #controlPanel {
+            background-color: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        #promptInput {
+            flex: 1;
+            padding: 10px;
+            margin-bottom: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 16px;
+        }
+
+        button {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+
+        button:hover {
+            background-color: #2980b9;
+        }
+
+        #webpageContainer {
+            background-color: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            min-height: 400px;
+        }
+
+        .highlight {
+            outline: 2px solid var(--accent-color);
+            cursor: pointer;
+        }
+
+        #editOverlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            display: none;
+            justify-content: center;
+            align-items: center;
+        }
+
+        #editForm {
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            width: 80%;
+            max-width: 500px;
+        }
+
+        #editInstruction {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 16px;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 10px;
+            }
+
+            button {
+                width: 100%;
+                margin-bottom: 10px;
+            }
+
+            #controlPanel {
+                flex-direction: column;
+            }
+        }
+
+        .import-wrapper {
+            position: relative;
+            overflow: hidden;
+            display: inline-block;
+        }
+
+        .import-wrapper input[type=file] {
+            font-size: 100px;
+            position: absolute;
+            left: 0;
+            top: 0;
+            opacity: 0;
+            cursor: pointer;
+        }
+
+        .import-button {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+            height: 50px; /* Ensure this matches the height of other buttons */
+            line-height: 24px; /* Adjust the line-height to center the text vertically */
+        }
+
+
+        .import-button:hover {
+            background-color: #2980b9;
+        }
+
+        @media (max-width: 768px) {
+            .import-wrapper {
+                width: 100%;
+            }
+
+            .import-button {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Generative AI Webpage Editor</h1>
+
+    <div id="controlPanel">
+        <input type="text" id="promptInput" placeholder="Enter your webpage description">
+        <button onclick="generateWebpage()">Generate Webpage</button>
+        <button onclick="startEditing()">Start Editing</button>
+        <button onclick="exportWebpage()">Export Webpage</button>
+        <div class="import-wrapper">
+            <button class="import-button">Import HTML</button>
+            <input type="file" id="fileInput" accept=".html,.htm" onchange="importHTML(this)">
+        </div>
+    </div>
+
+    <div id="webpageContainer"></div>
+
+    <div id="editOverlay">
+        <div id="editForm">
+            <textarea id="editInstruction" placeholder="Enter edit instruction" rows="4" cols="50"></textarea>
+            <button onclick="submitEdit()">Submit Edit</button>
+            <button onclick="cancelEdit()">Cancel</button>
+        </div>
+    </div>
+
+    <script>
+        let selectedElement = null;
+        let currentCacheKey = null;
+
+        async function generateWebpage() {
+            const prompt = document.getElementById('promptInput').value;
+            const response = await fetch('/generate', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ prompt: prompt }),
+            });
+            const data = await response.json();
+            document.getElementById('webpageContainer').innerHTML = data.html;
+            currentCacheKey = data.cacheKey;
+        }
+
+        function startEditing() {
+            const container = document.getElementById('webpageContainer');
+            container.addEventListener('mouseover', highlightElement);
+            container.addEventListener('mouseout', removeHighlight);
+            container.addEventListener('click', selectElement);
+        }
+
+        function highlightElement(event) {
+            if (event.target !== document.getElementById('webpageContainer')) {
+                event.target.classList.add('highlight');
+            }
+        }
+
+        function removeHighlight(event) {
+            if (event.target !== document.getElementById('webpageContainer')) {
+                event.target.classList.remove('highlight');
+            }
+        }
+
+        function selectElement(event) {
+            if (event.target !== document.getElementById('webpageContainer')) {
+                selectedElement = event.target;
+                document.getElementById('editOverlay').style.display = 'flex';
+            }
+        }
+
+        function cancelEdit() {
+            document.getElementById('editOverlay').style.display = 'none';
+            selectedElement = null;
+        }
+
+        function getAppliedStyles(element) {
+            const styles = window.getComputedStyle(element);
+            let cssText = element.style.cssText;
+            if (cssText === "") {
+                cssText = Array.from(styles).reduce((str, property) => {
+                    return `${str}${property}:${styles.getPropertyValue(property)};`;
+                }, "");
+            }
+            return cssText;
+        }
+
+        async function submitEdit() {
+            const instruction = document.getElementById('editInstruction').value;
+            const selectedHTML = selectedElement.outerHTML;
+            const selectedCSS = getAppliedStyles(selectedElement);
+
+            const response = await fetch('/edit', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    cacheKey: currentCacheKey,
+                    instruction: instruction,
+                    selectedHTML: selectedHTML,
+                    selectedCSS: selectedCSS
+                }),
+            });
+            const data = await response.json();
+            document.getElementById('webpageContainer').innerHTML = data.html;
+            currentCacheKey = data.cacheKey;
+
+            // Clean up
+            document.getElementById('editOverlay').style.display = 'none';
+            selectedElement = null;
+            document.getElementById('editInstruction').value = '';
+        }
+
+        async function exportWebpage() {
+            if (!currentCacheKey) {
+                alert('No webpage has been generated yet.');
+                return;
+            }
+
+            // Redirect to the export route
+            window.location.href = `/export?cacheKey=${currentCacheKey}`;
+        }
+
+        function importHTML(input) {
+            const file = input.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function (e) {
+                    const importedHTML = e.target.result;
+                    document.getElementById('webpageContainer').innerHTML = importedHTML;
+
+                    // Generate a new cache key for the imported HTML
+                    currentCacheKey = 'imported-' + Date.now();
+
+                    // Send the imported HTML to the server to cache it
+                    cacheImportedHTML(importedHTML);
+                };
+                reader.readAsText(file);
+            }
+        }
+
+        async function cacheImportedHTML(html) {
+            try {
+                const response = await fetch('/cache-imported', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        html: html,
+                        cacheKey: currentCacheKey
+                    }),
+                });
+                const data = await response.json();
+                if (!data.success) {
+                    console.error('Failed to cache imported HTML');
+                }
+            } catch (error) {
+                console.error('Error caching imported HTML:', error);
+            }
+        }
+    </script>
+</body>
+
+</html>
